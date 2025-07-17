@@ -32,7 +32,10 @@
 
 (defn listar-usuarios []
   (let [db (d/db conn)]
-    (d/q '[:find ?id 
+    (set (d/q '[:find ?id ?password ?name ?age
            :where
-           [?e :user/id ?id]]
-         db)))
+           [?e :user/id ?id]
+           [?e :user/password ?password]
+           [?e :user/name ?name]
+           [?e :user/age ?age]]
+         db))))

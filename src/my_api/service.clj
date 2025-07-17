@@ -3,6 +3,9 @@
             [my-api.bd-user :as db]
             [io.pedestal.http.body-params :as body-params]))
 
+(defn user-internal->out [[id _ name age]]
+{:id id :name name :age age})
+
 (db/ensure-schema)
 
 (def common-interceptors
@@ -20,7 +23,9 @@
     {:status 200 :body (str "Usuário cadastrado: " user)}))
 
 (defn all-users-handler [_request]
-  {:status 200 :body (db/listar-usuarios)})
+  (let [users (db/listar-usuarios)
+        response (map user-internal->out users)]
+  {:status 200 :body response}))
 
 
 (def routes
