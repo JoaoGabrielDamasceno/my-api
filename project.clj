@@ -7,6 +7,7 @@
                  [io.pedestal/pedestal.service "0.6.4"]
                  [io.pedestal/pedestal.jetty "0.6.4"]
                  [com.datomic/peer "1.0.7387"]
+                 [org.clojure/data.json "2.4.0"]
                  [org.slf4j/slf4j-simple "1.7.36"]]
   :main my-api.server
   :target-path "target/%s"
