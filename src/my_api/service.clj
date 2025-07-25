@@ -35,42 +35,11 @@
     (treino-db/inserir-treino! treino)
     {:status 200 :body (str "Treino cadastrado: " treino)}))
 
-(defn ensure-vector [x]
-  (if (sequential? x) x [x]))
-
-(defn all-treinos-handler [_request]
-  (let [db (treino-db/get-conn-db)
-        treinos (treino-db/listar-treinos)
-        response (map (fn [[id exercicio data series-ids]]
-                       {:id id
-                        :exercicio exercicio
-                        :data data
-                        :series (mapv #(treino-db/buscar-serie-por-id db %) (ensure-vector series-ids))})
-                     treinos)]
-    {:status 200 :body response}))
-
-(defn treino-por-id-handler [request]
-  (let [db (treino-db/get-conn-db)
-        treino-id (java.util.UUID/fromString (get-in request [:path-params :id]))
-        treinos (treino-db/buscar-treino-por-id treino-id)
-        response (map (fn [[exercicio data series-ids]]
-                       {:exercicio exercicio
-                        :data data
-                        :series (mapv #(treino-db/buscar-serie-por-id db %) (ensure-vector series-ids))})
-                     treinos)]
-    {:status 200 :body response}))
-
-(defn treinos-por-data-handler [request]
-  (let [db (treino-db/get-conn-db)
-        data-str (get-in request [:path-params :data])
-        treinos (treino-db/buscar-treinos-por-data data-str)
-        response (map (fn [[id exercicio series-ids]]
-                       {:id id
-                        :exercicio exercicio
-                        :series (mapv #(treino-db/buscar-serie-por-id db %) (ensure-vector series-ids))})
-                     treinos)]
-    {:status 200 :body response}))
-
+;; Novo handler para exibir o histórico de um exercício
+(defn exibir-exercicio-handler [request]
+  (let [exercicio (-> request :path-params :exercicio keyword)
+        treinos (treino-db/listar-treinos-por-exercicio exercicio)]
+    {:status 200 :body treinos}))
 
 (def routes
   #{["/" 
@@ -92,18 +61,11 @@
     ["/create-treino" 
      :post (conj common-interceptors create-treino-handler)
      :route-name :create-treino]
-    
-    ["/treinos"
-     :get all-treinos-handler
-     :route-name :treinos]
-    
-    ["/treino/:id"
-     :get treino-por-id-handler
-     :route-name :treino-por-id]
-    
-    ["/treinos/data/:data"
-     :get treinos-por-data-handler
-     :route-name :treinos-por-data]})
+     
+    ;; Novo endpoint para exibir o histórico de um exercício via URL
+    ["/exibir-exercicio/:exercicio"
+     :get (conj common-interceptors exibir-exercicio-handler)
+     :route-name :exibir-exercicio]} )
 
 (def service
   {:env :prod
