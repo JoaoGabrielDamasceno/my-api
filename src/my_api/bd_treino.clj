@@ -58,18 +58,6 @@
   []
   (java.util.UUID/randomUUID))
 
-(defn buscar-treino-por-id
-  "Busca um treino específico pelo seu ID"
-  [id]
-  (d/q '[:find ?exercicio ?data ?series
-         :in $ ?id
-         :where
-         [?t :treino/id ?id]
-         [?t :treino/exercicio ?exercicio]
-         [?t :treino/data ?data]
-         [?t :treino/series ?series]]
-       (d/db conn) id))
-
 (defn inserir-treino!
   "Insere um treino com múltiplas séries.
   Exemplo de uso:
@@ -91,8 +79,8 @@
     @(d/transact conn (concat series-tx [treino-tx]))))
 
 (defn processar-treinos-por-exercicio
-  [exercicios]
-  (->> exercicios
+  [treinos]
+  (->> treinos
        (group-by first)
        (map (fn [[data treinos-data]]
               {:data data
@@ -103,10 +91,10 @@
                              treinos-data)}))
        (sort-by :data)))
 
-(defn listar-treinos-por-exercicio
+(defn listar-exercicios-por-nome
   "Retorna todos os treinos atuais de um exercício específico.
-  Exemplo de uso: (listar-treinos-por-exercicio :supino-reto)"
-  [ex]
+  Exemplo de uso: (listar-exercicios-por-nome :supino-reto)"
+  [exercicio]
   (-> (d/q '[:find ?data ?serie-num ?serie-rep ?serie-peso
               :in $ ?exercicio
               :where
@@ -117,6 +105,32 @@
               [?serie :serie/numero ?serie-num]
               [?serie :serie/repeticoes ?serie-rep]
               [?serie :serie/peso ?serie-peso]]
-            (d/db conn) ex)
+            (d/db conn) exercicio)
       (vec)
       (processar-treinos-por-exercicio)))
+
+(defn listar-todos-exercicios-por-data
+  "Retorna todos os exercícios de uma data específica.
+  Exemplo de uso: (listar-todos-exercicios-por-data \"2024-06-01\")"
+  [data]
+  (-> (d/q '[:find ?exercicio ?serie-num ?serie-rep ?serie-peso
+              :in $ ?data
+              :where
+              [?t :treino/id ?id]
+              [?t :treino/exercicio ?exercicio]
+              [?t :treino/data ?data]
+              [?t :treino/series ?serie]
+              [?serie :serie/numero ?serie-num]
+              [?serie :serie/repeticoes ?serie-rep]
+              [?serie :serie/peso ?serie-peso]]
+            (d/db conn) data)
+      (vec)
+      (->> (group-by first)
+           (map (fn [[exercicio treinos-exercicio]]
+                  {:exercicio exercicio
+                   :series (mapv (fn [[_ numero repeticoes peso]]
+                                   {:numero numero
+                                    :repeticoes repeticoes
+                                    :peso peso})
+                                 treinos-exercicio)}))
+           (sort-by :exercicio))))

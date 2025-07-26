@@ -38,8 +38,13 @@
 ;; Novo handler para exibir o histórico de um exercício
 (defn exibir-exercicio-handler [request]
   (let [exercicio (-> request :path-params :exercicio keyword)
-        treinos (treino-db/listar-treinos-por-exercicio exercicio)]
+        treinos (treino-db/listar-exercicios-por-nome exercicio)]
     {:status 200 :body treinos}))
+
+(defn exibir-treino-handler [request]
+  (let [data (-> request :path-params :data)
+        treino (treino-db/listar-todos-exercicios-por-data data)]
+    {:status 200 :body treino}))
 
 (def routes
   #{["/" 
@@ -61,11 +66,14 @@
     ["/create-treino" 
      :post (conj common-interceptors create-treino-handler)
      :route-name :create-treino]
-     
-    ;; Novo endpoint para exibir o histórico de um exercício via URL
+    
     ["/exibir-exercicio/:exercicio"
      :get (conj common-interceptors exibir-exercicio-handler)
-     :route-name :exibir-exercicio]} )
+     :route-name :exibir-exercicio]
+    
+    ["/exibir-treino/:data"
+     :get (conj common-interceptors exibir-treino-handler)
+     :route-name :exibir-treino]})
 
 (def service
   {:env :prod
