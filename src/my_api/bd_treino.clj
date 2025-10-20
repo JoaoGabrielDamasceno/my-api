@@ -9,6 +9,12 @@
     :db/unique      :db.unique/identity
     :db/doc         "ID único do treino"}
 
+   ;; Atributo para associar o treino a um usuário
+   {:db/ident       :treino/user-id
+    :db/valueType   :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db/doc         "ID do usuário dono do treino"}
+
    ;; Atributo para nome do exercício
    {:db/ident       :treino/exercicio
     :db/valueType   :db.type/keyword
@@ -61,11 +67,12 @@
 (defn inserir-treino!
   "Insere um treino com múltiplas séries.
   Exemplo de uso:
-  (inserir-treino! {:exercicio :supino-reto
+  (inserir-treino! {:user-id \"usuario123\"
+                    :exercicio :supino-reto
                     :data \"2024-06-01\"
                     :series [{:numero 1 :repeticoes 10 :peso 60}
                              {:numero 2 :repeticoes 8 :peso 65}]})"
-  [{:keys [exercicio data series]}]
+  [{:keys [user-id exercicio data series]}]
   (let [id (gerar-id-treino)
         series-tx (mapv (fn [{:keys [numero repeticoes peso]}]
                           {:db/id (d/tempid :db.part/user)
@@ -73,6 +80,7 @@
                            :serie/repeticoes repeticoes
                            :serie/peso peso}) series)
         treino-tx {:treino/id id
+                   :treino/user-id user-id
                    :treino/exercicio exercicio
                    :treino/data data
                    :treino/series (mapv #(select-keys % [:db/id]) series-tx)}]
@@ -134,3 +142,81 @@
                                     :peso peso})
                                  treinos-exercicio)}))
            (sort-by :exercicio))))
+
+(defn listar-todos-treinos
+  "Retorna todos os treinos cadastrados, agrupados por data e exercício.
+  Opcionalmente filtra por data e/ou user-id se fornecidos."
+  ([]
+   (listar-todos-treinos nil nil))
+  ([data-filtro]
+   (listar-todos-treinos data-filtro nil))
+  ([data-filtro user-id]
+   (let [query (cond
+                 (and data-filtro user-id)
+                 '[:find ?data ?exercicio ?serie-num ?serie-rep ?serie-peso
+                   :in $ ?data-filtro ?user-id
+                   :where
+                   [?t :treino/id ?id]
+                   [?t :treino/user-id ?user-id]
+                   [?t :treino/exercicio ?exercicio]
+                   [?t :treino/data ?data]
+                   [?t :treino/series ?serie]
+                   [?serie :serie/numero ?serie-num]
+                   [?serie :serie/repeticoes ?serie-rep]
+                   [?serie :serie/peso ?serie-peso]
+                   [(= ?data ?data-filtro)]]
+                 
+                 user-id
+                 '[:find ?data ?exercicio ?serie-num ?serie-rep ?serie-peso
+                   :in $ ?user-id
+                   :where
+                   [?t :treino/id ?id]
+                   [?t :treino/user-id ?user-id]
+                   [?t :treino/exercicio ?exercicio]
+                   [?t :treino/data ?data]
+                   [?t :treino/series ?serie]
+                   [?serie :serie/numero ?serie-num]
+                   [?serie :serie/repeticoes ?serie-rep]
+                   [?serie :serie/peso ?serie-peso]]
+                 
+                 data-filtro
+                 '[:find ?data ?exercicio ?serie-num ?serie-rep ?serie-peso
+                   :in $ ?data-filtro
+                   :where
+                   [?t :treino/id ?id]
+                   [?t :treino/exercicio ?exercicio]
+                   [?t :treino/data ?data]
+                   [?t :treino/series ?serie]
+                   [?serie :serie/numero ?serie-num]
+                   [?serie :serie/repeticoes ?serie-rep]
+                   [?serie :serie/peso ?serie-peso]
+                   [(= ?data ?data-filtro)]]
+                 
+                 :else
+                 '[:find ?data ?exercicio ?serie-num ?serie-rep ?serie-peso
+                   :where
+                   [?t :treino/id ?id]
+                   [?t :treino/exercicio ?exercicio]
+                   [?t :treino/data ?data]
+                   [?t :treino/series ?serie]
+                   [?serie :serie/numero ?serie-num]
+                   [?serie :serie/repeticoes ?serie-rep]
+                   [?serie :serie/peso ?serie-peso]])
+         results (cond
+                   (and data-filtro user-id) (d/q query (d/db conn) data-filtro user-id)
+                   user-id (d/q query (d/db conn) user-id)
+                   data-filtro (d/q query (d/db conn) data-filtro)
+                   :else (d/q query (d/db conn)))]
+     (->> results
+          (group-by (fn [[data exercicio _ _ _]] [data exercicio]))
+          (map (fn [[[data exercicio] series-data]]
+                 {:data data
+                  :exercicio (name exercicio)
+                  :series (mapv (fn [[_ _ numero repeticoes peso]]
+                                  {:serie numero
+                                   :repeticao repeticoes
+                                   :peso peso})
+                                (sort-by #(nth % 2) series-data))}))
+          (sort-by :data)
+          (reverse)
+          (vec)))))

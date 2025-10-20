@@ -56,16 +56,31 @@
     {:id id :nome nome :nome-interno nome-interno-kw :categoria categoria}))
 
 (defn listar-exercicios
-  "Retorna vetor de mapas contendo :nome e :nome-interno para todos os exercícios."
+  "Retorna vetor de mapas contendo :nome, :nome-interno e :categoria para todos os exercícios."
   []
-  (->> (d/q '[:find ?nome ?nome-interno
+  (->> (d/q '[:find ?nome ?nome-interno ?categoria
               :where
               [?e :exercicio/nome ?nome]
-              [?e :exercicio/nome-interno ?nome-interno]]
+              [?e :exercicio/nome-interno ?nome-interno]
+              [?e :exercicio/categoria ?categoria]]
             (d/db conn))
-       (map (fn [[nome nome-interno]] 
+       (map (fn [[nome nome-interno categoria]] 
               {:nome (str/capitalize nome)
-               :nome-interno (name nome-interno)}))
+               :nome-interno (name nome-interno)
+               :categoria categoria}))
        (sort-by :nome)
+       (vec)))
+
+
+(defn listar-categorias
+  "Retorna lista de todas as categorias distintas."
+  []
+  (->> (d/q '[:find ?categoria
+              :where
+              [?e :exercicio/categoria ?categoria]]
+            (d/db conn))
+       (map first)
+       (distinct)
+       (sort)
        (vec)))
 
